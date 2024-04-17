@@ -20,7 +20,7 @@ func game_setup(policy_type = AIPolicyRules):
 	game_logic = LocalGame.new(image_loader)
 	var seed_value = randi()
 	game_logic.initialize_game(
-			default_deck, CardDefinitions.get_deck_from_str_id("random"),
+			default_deck, opponent_deck,
 			"p1", "p2", Enums.PlayerId.PlayerId_Player, seed_value)
 	game_logic.draw_starting_hands_and_begin()
 	game_logic.get_latest_events()
