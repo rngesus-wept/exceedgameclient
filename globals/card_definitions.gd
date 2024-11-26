@@ -33,6 +33,8 @@ func get_deck_from_str_id(str_id : String) -> Dictionary:
 		return get_random_deck(4)
 	if str_id == "random_s3":
 		return get_random_deck(3)
+	if str_id == "random_s2":
+		return get_random_deck(2)
 	if str_id == "random":
 		return get_random_deck(-1)
 	return decks.get(str_id)
@@ -147,6 +149,9 @@ func get_gauge_for_effect_summary(effect, card_name_source : String) -> String:
 	var gauge_card_str = "gauge"
 	if 'require_specific_card_name' in effect:
 		gauge_card_str = "copies of %s from gauge" % effect['require_specific_card_name']
+	elif 'valid_card_types' in effect:
+		gauge_card_str = "%s(s) from gauge" % '/'.join(effect['valid_card_types'])
+
 	if "per_gauge_effect" in effect and effect['per_gauge_effect'] != null:
 		if to_hand:
 			effect_str += "Return up to %s %s to your hand. For each, %s" % [str(gauge_limit), gauge_card_str, get_effect_text(effect['per_gauge_effect'], false, true, true, card_name_source)]
@@ -236,6 +241,8 @@ func get_condition_text(effect, amount, amount2, detail):
 			text += "If %s is not in opponent's space, " % detail
 		"at_edge_of_arena":
 			text += "If at arena edge, "
+		"attack_still_in_play":
+			text += "If your attack is still in play, "
 		"boost_in_play":
 			text += "If a boost is in play, "
 		"canceled_this_turn":
@@ -321,6 +328,8 @@ func get_condition_text(effect, amount, amount2, detail):
 			text += ""
 		"is_special_or_ultra_attack":
 			text += "For specials/ultras, "
+		"opponent_is_special_attack":
+			text += "If opponent strikes with a special, "
 		"is_normal_attack":
 			text += "If you strike with a normal, "
 		"deck_not_empty":
@@ -401,6 +410,10 @@ func get_condition_text(effect, amount, amount2, detail):
 			text += ""
 		"boost_in_play_or_parents":
 			text += "If a \"%s\" boost is in play, " % detail
+		"is_ex_strike":
+			text += "If attack is EX, "
+		"same_card_as_boost_in_hand":
+			text += ""
 		_:
 			text += "MISSING CONDITION"
 	return text
@@ -690,6 +703,8 @@ func get_effect_type_text(effect, card_name_source : String = "", char_effect_pa
 			effect_str += "Critical Strike"
 		"discard_this":
 			effect_str += "Discard this"
+		"discard_same_card_as_boost":
+			effect_str += "Discard a copy of the boosted card"
 		"discard_strike_after_cleanup":
 			effect_str += "Discard attack on cleanup"
 		"discard_continuous_boost":
@@ -838,6 +853,8 @@ func get_effect_type_text(effect, card_name_source : String = "", char_effect_pa
 				effect_str += str(effect['amount']) + " Guard"
 		"guardup_per_force_spent_this_turn":
 			effect_str += "+" + str(effect['amount']) + " Guard per force spent this turn."
+		"guardup_per_two_cards_in_hand":
+			effect_str += "+1 Guard per 2 cards in hand"
 		"ignore_armor":
 			if 'opponent' in effect and effect['opponent']:
 				effect_str += "Opponent ignores armor"
@@ -872,6 +889,8 @@ func get_effect_type_text(effect, card_name_source : String = "", char_effect_pa
 			effect_str += "Lose all armor"
 		"name_card_opponent_discards":
 			effect_str += "Name a card. Opponent discards it or reveals not in hand."
+		"negate_boost":
+			effect_str += "Discard opponent's boost without effect"
 		"may_advance_bonus_spaces":
 			effect_str = "You may Advance/Close %s extra space(s)" % effect['amount']
 		"move_any_buddy":
@@ -1120,6 +1139,8 @@ func get_effect_type_text(effect, card_name_source : String = "", char_effect_pa
 			if optional:
 				begin_str = "You may: "
 			effect_str += "%sRemove %s %s opponent's space" % [begin_str, effect['buddy_name'], location_str]
+		"reduce_discard_amount":
+			effect_str += "Reduce discard effects by %s" % effect['amount']
 		"remove_X_buddies":
 			effect_str += "Remove X %ss" % [effect['buddy_name']]
 		"repeat_effect_optionally":
@@ -1327,6 +1348,8 @@ func get_effect_type_text(effect, card_name_source : String = "", char_effect_pa
 		"strike_response_reading":
 			if 'ex_card_id' in effect:
 				effect_str += "EX Strike"
+				if 'overload_name' in effect:
+					effect_str += " (Overload: %s)" % effect['overload_name']
 			else:
 				effect_str += "Strike"
 		"strike_with_ex":
@@ -1358,6 +1381,11 @@ func get_effect_type_text(effect, card_name_source : String = "", char_effect_pa
 			if 'nonlethal' in effect and effect['nonlethal']:
 				nonlethal_str = " nonlethal"
 			effect_str += "%s %s%s damage" % [who_str, str(effect['amount']), nonlethal_str]
+		"transform_attack":
+			if 'card_name' in effect:
+				effect_str += "Transform %s" % effect['card_name']
+			else:
+				effect_str += "Transform attack"
 		"topdeck_from_hand":
 			effect_str += "Put a card from your hand on top of your deck"
 		"when_hit_force_for_armor":
@@ -1377,6 +1405,8 @@ func get_effect_text(effect, short = false, skip_timing = false, skip_condition 
 	var effect_str = ""
 	if 'hide_effect' in effect and effect['hide_effect']:
 		return effect_str
+	if 'override_description' in effect:
+		return effect['override_description']
 
 	if 'timing' in effect and not skip_timing:
 		effect_str += get_timing_text(effect['timing'])

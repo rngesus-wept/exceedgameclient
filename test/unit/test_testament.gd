@@ -1,9 +1,8 @@
 extends GutTest
 
-const LocalGame = preload("res://scenes/game/local_game.gd")
-const GameCard = preload("res://scenes/game/game_card.gd")
-const Enums = preload("res://scenes/game/enums.gd")
+
 var game_logic : LocalGame
+var image_loader : CardImageLoader
 var default_deck = CardDefinitions.get_deck_from_str_id("testament")
 const TestCardId1 = 50001
 const TestCardId2 = 50002
@@ -15,7 +14,8 @@ var player1 : LocalGame.Player
 var player2 : LocalGame.Player
 
 func default_game_setup():
-	game_logic = LocalGame.new()
+	image_loader = CardImageLoader.new(true)
+	game_logic = LocalGame.new(image_loader)
 	var seed_value = randi()
 	game_logic.initialize_game(default_deck, default_deck, "p1", "p2", Enums.PlayerId.PlayerId_Player, seed_value)
 	game_logic.draw_starting_hands_and_begin()
@@ -27,7 +27,7 @@ func default_game_setup():
 
 func give_player_specific_card(player, def_id, card_id):
 	var card_def = CardDefinitions.get_card(def_id)
-	var card = GameCard.new(card_id, card_def, "image", player.my_id)
+	var card = GameCard.new(card_id, card_def, player.my_id)
 	var card_db = game_logic.get_card_database()
 	card_db._test_insert_card(card)
 	player.hand.append(card)
@@ -201,6 +201,41 @@ func get_cards_from_gauge(player : LocalGame.Player, amount : int):
 ## Tests start here
 ##
 
-func test_testament_():
-	position_players(player1, 3, player2, 4)
-	validate_positions(player1, 3, player2, 4)
+func test_testament_unholy_courtesy():
+	position_players(player1, 3, player2, 6)
+	give_player_specific_card(player1, "testament_scytheswing", TestCardId1)
+	assert_true(game_logic.do_boost(player1, TestCardId1))
+	advance_turn(player2)
+	give_player_specific_card(player1, "testament_unholydiver", TestCardId2)
+	give_player_specific_card(player2, "testament_unholydiver", TestCardId3)
+	assert_true(game_logic.do_strike(player1, TestCardId2, false, -1))
+	assert_true(game_logic.do_strike(player2, TestCardId3, false, -1))
+	# P1 hits and gets the unholy diver choice
+	assert_true(game_logic.do_choice(player1, 0)) # Boost it
+	# Then they get the advance/retreat choice.
+	assert_true(game_logic.do_choice(player1, 0)) # Advance 1
+	# Then the scythe boost does nothing and this remains in play.
+	assert_eq(player1.gauge.size(), 0)
+	assert_eq(player1.continuous_boosts.size(), 1)
+	validate_positions(player1, 4, player2, 6)
+	advance_turn(player2)
+
+func test_testament_unholy_courtesy_no_boostsustain():
+	position_players(player1, 3, player2, 6)
+	give_player_specific_card(player1, "testament_scytheswing", TestCardId1)
+	assert_true(game_logic.do_boost(player1, TestCardId1))
+	advance_turn(player2)
+	give_player_specific_card(player1, "testament_unholydiver", TestCardId2)
+	give_player_specific_card(player2, "testament_unholydiver", TestCardId3)
+	assert_true(game_logic.do_strike(player1, TestCardId2, false, -1))
+	assert_true(game_logic.do_strike(player2, TestCardId3, false, -1))
+	# P1 hits and gets the unholy diver choice
+	assert_true(game_logic.do_choice(player1, 1)) # Pass on this
+	# Then they get the scythe swing boost choice.
+	assert_true(game_logic.do_choice(player1, 0)) # Return it to hand
+	assert_eq(player1.gauge.size(), 1)
+	assert_eq(player1.gauge[0].id, TestCardId1)
+	assert_eq(player1.continuous_boosts.size(), 0)
+	assert_eq(player1.hand[player1.hand.size()-1].id, TestCardId2)
+	validate_positions(player1, 3, player2, 6)
+	advance_turn(player2)

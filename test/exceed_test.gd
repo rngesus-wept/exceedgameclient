@@ -2,6 +2,7 @@ class_name ExceedGutTest
 extends GutTest
 
 var game_logic : LocalGame
+var image_loader : CardImageLoader
 var next_test_card_id = 50000
 
 var player1 : LocalGame.Player
@@ -21,7 +22,8 @@ func default_game_setup(alt_opponent : String = ""):
 	var opponent_deck = default_deck
 	if alt_opponent:
 		opponent_deck = CardDefinitions.get_deck_from_str_id(alt_opponent)
-	game_logic = LocalGame.new()
+	image_loader = CardImageLoader.new(true)
+	game_logic = LocalGame.new(image_loader)
 	var seed_value = randi()
 	game_logic.initialize_game(default_deck, opponent_deck, "p1", "p2",
 			Enums.PlayerId.PlayerId_Player, seed_value)
@@ -35,7 +37,7 @@ func default_game_setup(alt_opponent : String = ""):
 func give_player_specific_card(player, def_id):
 	var card_def = CardDefinitions.get_card(def_id)
 	var card_id = next_id()
-	var card = GameCard.new(card_id, card_def, "image", player.my_id)
+	var card = GameCard.new(card_id, card_def, player.my_id)
 	var card_db = game_logic.get_card_database()
 	card_db._test_insert_card(card)
 	player.hand.append(card)
@@ -140,9 +142,9 @@ func advance_turn(player):
 	assert_true(game_logic.do_prepare(player),
 			"Player %s tried to prepare but could not (%s)." % [
 					player.my_id + 1, game_or_decision_state_string()])
-	if player.hand.size() > 7:
+	if player.hand.size() > player.max_hand_size:
 		var cards = []
-		var to_discard = player.hand.size() - 7
+		var to_discard = player.hand.size() - player.max_hand_size
 		for i in range(to_discard):
 			cards.append(player.hand[i].id)
 		assert_true(game_logic.do_discard_to_max(player, cards))
@@ -345,7 +347,8 @@ func process_remaining_decisions(initiator, defender, init_choices, def_choices)
 
 func execute_strike(initiator: LocalGame.Player, defender: LocalGame.Player,
 		init_card: Variant, def_card: Variant, init_ex = false, def_ex = false,
-		init_choices = [], def_choices = [], exit_after_validation = false):
+		init_choices = [], def_choices = [], exit_after_validation = false,
+		init_alt_ex_card: Variant = "", def_alt_ex_card: Variant = ""):
 	var init_card_id = -1
 	var init_card_ex_id = -1
 	var def_card_id = -1
@@ -354,12 +357,17 @@ func execute_strike(initiator: LocalGame.Player, defender: LocalGame.Player,
 	if typeof(init_card) == Variant.Type.TYPE_STRING and init_card:
 		init_card_id = give_player_specific_card(initiator, init_card)
 		if init_ex:
-			init_card_ex_id = give_player_specific_card(initiator, init_card)
+			var init_card_def_id = init_card
+			if init_alt_ex_card:
+				init_card_def_id = init_alt_ex_card
+			init_card_ex_id = give_player_specific_card(initiator, init_card_def_id)
 		do_and_validate_strike(initiator, init_card_id, init_card_ex_id)
 	elif typeof(init_card) == Variant.Type.TYPE_INT and init_card >= 0:
 		init_card_id = init_card
 		if init_ex:
 			var init_card_def_id = game_logic.get_card_database().get_card_id(init_card)
+			if init_alt_ex_card:
+				init_card_def_id = init_alt_ex_card
 			init_card_ex_id = give_player_specific_card(initiator, init_card_def_id)
 		do_and_validate_strike(initiator, init_card_id, init_card_ex_id)
 	else:
@@ -369,12 +377,17 @@ func execute_strike(initiator: LocalGame.Player, defender: LocalGame.Player,
 	if typeof(def_card) == Variant.Type.TYPE_STRING and def_card:
 		def_card_id = give_player_specific_card(defender, def_card)
 		if def_ex:
-			def_card_ex_id = give_player_specific_card(defender, def_card)
+			var def_card_def_id = def_card
+			if def_alt_ex_card:
+				def_card_def_id = def_alt_ex_card
+			def_card_ex_id = give_player_specific_card(defender, def_card_def_id)
 		do_strike_response(defender, def_card_id, def_card_ex_id)
 	elif typeof(def_card) == Variant.Type.TYPE_INT and def_card >= 0:
 		def_card_id = def_card
 		if def_ex:
 			var def_card_def_id = game_logic.get_card_database().get_card_id(def_card)
+			if def_alt_ex_card:
+				def_card_def_id = def_alt_ex_card
 			def_card_ex_id = give_player_specific_card(defender, def_card_def_id)
 		do_strike_response(defender, def_card_id, def_card_ex_id)
 	else:

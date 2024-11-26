@@ -1,10 +1,6 @@
 class_name AIPolicyRules
 extends Node
 
-const AIPlayer = preload("res://scenes/game/ai_player.gd")
-const GameCard = preload("res://scenes/game/game_card.gd")
-const Enums = preload("res://scenes/game/enums.gd")
-
 
 var __factorial_cache = {
 	"cache_max": 7,
@@ -216,6 +212,8 @@ func pick_turn_action(possible_actions : Array, ai_game_state : AIPlayer.AIGameS
 						boost_choices.append(action)
 				if boost_choices.size() > 0:
 					return boost_choices[randi() % boost_choices.size()]
+
+		# TODO: consider EX transform
 
 		# Try to character action.
 		var skip_character_action = false

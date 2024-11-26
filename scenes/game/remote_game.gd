@@ -6,21 +6,24 @@
 # `process_Z()`. Because this mapping is done through string manipulation, it is
 # important that X == Y == Z.
 
+class_name RemoteGame
 extends Node
-
-const LocalGame = preload("res://scenes/game/local_game.gd")
-const Enums = preload("res://scenes/game/enums.gd")
-const CardDatabase = preload("res://scenes/game/card_database.gd")
-const DecisionInfo = preload("res://scenes/game/decision_info.gd")
-
 
 var local_game : LocalGame
 
 var _player_info
 var _opponent_info
 var _observer_mode : bool
+var _replay_mode : bool
 var _game_message_queue : Array
 var _game_message_history : Array
+
+var image_loader : CardImageLoader
+func _init(card_image_loader):
+	image_loader = card_image_loader
+
+func teardown():
+	return local_game.teardown()
 
 func get_latest_events() -> Array:
 	return local_game.get_latest_events()
@@ -49,11 +52,12 @@ func _get_player_from_remote_id(remote_id : int):
 func get_striking_card_ids_for_player(player : LocalGame.Player) -> Array:
 	return local_game.get_striking_card_ids_for_player(player)
 
-func initialize_game(player_info, 
-		opponent_info, 
-		starting_player : Enums.PlayerId, 
-		seed_value : int, 
-		observer_mode : bool, 
+func initialize_game(player_info,
+		opponent_info,
+		starting_player : Enums.PlayerId,
+		seed_value : int,
+		observer_mode : bool,
+		replay_mode : bool,
 		starting_message_queue : Array):
 	_game_message_queue = starting_message_queue
 	_game_message_history = []
@@ -61,8 +65,9 @@ func initialize_game(player_info,
 	_player_info = player_info
 	_opponent_info = opponent_info
 	_observer_mode = observer_mode
-	local_game = LocalGame.new()
-	local_game.initialize_game(player_info['deck'], opponent_info['deck'], 
+	_replay_mode = replay_mode
+	local_game = LocalGame.new(image_loader)
+	local_game.initialize_game(player_info['deck'], opponent_info['deck'],
 		player_info['name'], opponent_info['name'], starting_player, seed_value)
 	local_game.draw_starting_hands_and_begin()
 
@@ -100,7 +105,8 @@ func _save_game_message(game_message):
 	_game_message_history.append(updated_game_message)
 
 func _on_disconnected():
-	local_game.do_quit(Enums.PlayerId.PlayerId_Player, Enums.GameOverReason.GameOverReason_Disconnect)
+	if not _replay_mode:
+		local_game.do_quit(Enums.PlayerId.PlayerId_Player, Enums.GameOverReason.GameOverReason_Disconnect)
 
 func _on_remote_player_quit(_is_disconnect : bool):
 	var reason = Enums.GameOverReason.GameOverReason_Quit
@@ -140,6 +146,9 @@ func can_do_reshuffle(player : LocalGame.Player) -> bool:
 
 func can_do_boost(player : LocalGame.Player) -> bool:
 	return local_game.can_do_boost(player)
+
+func can_do_ex_transform(player : LocalGame.Player) -> bool:
+	return local_game.can_do_ex_transform(player)
 
 func can_do_strike(player : LocalGame.Player) -> bool:
 	return local_game.can_do_strike(player)
@@ -552,7 +561,7 @@ func do_match_result(player_clock_remaining, opponent_clock_remaining):
 	}
 	_submit_game_message(action_message)
 	return true
-	
+
 # In order to make sure a player only gets a game over for seeing the clock
 # on their screen run out, this function assumes that the local player
 # is the one whose clock ran out and should only be called when this is true.
